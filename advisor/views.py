@@ -1,5 +1,5 @@
 from django.shortcuts import render
-from .forms import CareerForm
+from django.http import JsonResponse
 
 career_paths = {
     "ai": ["Machine Learning Engineer", "Data Scientist", "AI Researcher", "AI Product Manager"],
@@ -7,27 +7,15 @@ career_paths = {
     "design": ["UI/UX Designer", "Graphic Designer", "Product Designer", "Game Designer"],
     "healthcare": ["Doctor", "Nurse", "Medical Researcher", "Healthcare Administrator"],
     "law": ["Corporate Lawyer", "Judge", "Legal Advisor", "Criminal Lawyer"],
-    "dance": ["Choreographer", "Dance Academy", "Influencer", "Background Dancer"],
+    "dance": ["Choreographer", "Dance Academy Owner", "Influencer", "Background Dancer"],
 }
 
-def career_advice(request):
-    careers = []
-    advice_text = ""
-    if request.method == "POST":
-        form = CareerForm(request.POST)
-        if form.is_valid():
-            interest = form.cleaned_data["interest"].lower()
-            careers = career_paths.get(interest, [])
-            if careers:
-                advice_text = f"Career options for {interest.capitalize()}:"
-            else:
-                advice_text = "Sorry, no suggestions available for this interest."
-    else:
-        form = CareerForm()
-    
-    context = {
-        "form": form,
-        "careers": careers,
-        "advice_text": advice_text
-    }
-    return render(request, "advisor/home.html", context)
+def home(request):
+    return render(request, "advisor/home.html")
+
+def get_careers(request):
+    if request.method == "POST" and request.headers.get("x-requested-with") == "XMLHttpRequest":
+        interest = request.POST.get("interest", "").lower()
+        careers = career_paths.get(interest, ["Sorry, no suggestions available for this interest."])
+        return JsonResponse({"careers": careers})
+    return JsonResponse({"error": "Invalid request"}, status=400)

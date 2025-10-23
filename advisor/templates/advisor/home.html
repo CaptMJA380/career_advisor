@@ -1,50 +1,129 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Career Advisor</title>
-<style>
-    body { font-family: Arial; background: #f0f2f5; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-    .card { background: #fff; padding: 30px 40px; border-radius: 10px; box-shadow: 0 8px 20px rgba(0,0,0,0.1); width: 400px; }
-    h1 { text-align: center; color: #333; }
-    form { display: flex; flex-direction: column; gap: 20px; }
-    label { font-weight: bold; margin-bottom: 5px; color: #555; }
-    input { padding: 10px; border-radius: 5px; border: 1px solid #ccc; font-size: 16px; transition: 0.3s; }
-    input:focus { border-color: #007bff; outline: none; box-shadow: 0 0 5px rgba(0,123,255,0.5); }
-    button { padding: 12px; border-radius: 5px; border: none; background: #007bff; color: white; font-size: 16px; cursor: pointer; transition: 0.3s; }
-    button:hover { background: #0056b3; }
-    .advice { margin-top: 20px; background: #e7f3ff; padding: 15px; border-radius: 5px; border-left: 4px solid #007bff; }
-    ul { padding-left: 20px; }
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Career Advisor</title>
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: linear-gradient(to right, #a8edea, #fed6e3);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            width: 420px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        h2 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        .interest-btn {
+            background: #4a90e2;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 12px 20px;
+            margin: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: 0.3s;
+        }
+
+        .interest-btn:hover {
+            background: #357ABD;
+            transform: scale(1.05);
+        }
+
+        #results {
+            margin-top: 25px;
+            font-size: 16px;
+            color: #444;
+        }
+
+        .career-card {
+            background: #f1f5f9;
+            border-radius: 10px;
+            padding: 10px;
+            margin: 8px 0;
+            box-shadow: 0 3px 6px rgba(0,0,0,0.1);
+        }
+    </style>
 </head>
 <body>
+    <div class="container">
+        <h2>Choose Your Area of Interest</h2>
 
-<div class="card">
-    <h1>Career Advisor</h1>
-    <form method="POST">
-        {% csrf_token %}
-        {{ form.name.label_tag }}
-        {{ form.name }}
+        <div id="interest-options">
+            <button class="interest-btn" data-interest="ai">AI & Machine Learning</button>
+            <button class="interest-btn" data-interest="finance">Finance</button>
+            <button class="interest-btn" data-interest="design">Design</button>
+            <button class="interest-btn" data-interest="healthcare">Healthcare</button>
+            <button class="interest-btn" data-interest="law">Law</button>
+            <button class="interest-btn" data-interest="dance">Dance</button>
+        </div>
 
-        {{ form.interest.label_tag }}
-        {{ form.interest }}
-
-        <button type="submit">Get Advice</button>
-    </form>
-
-    {% if advice_text %}
-    <div class="advice">
-        <strong>{{ advice_text }}</strong>
-        {% if careers %}
-        <ul>
-            {% for career in careers %}
-            <li>{{ career }}</li>
-            {% endfor %}
-        </ul>
-        {% endif %}
+        <div id="results"></div>
     </div>
-    {% endif %}
-</div>
 
+    <script>
+        document.querySelectorAll(".interest-btn").forEach(button => {
+            button.addEventListener("click", function() {
+                const interest = this.getAttribute("data-interest");
+                fetch("/get_careers/", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/x-www-form-urlencoded",
+                        "X-CSRFToken": getCookie("csrftoken"),
+                        "X-Requested-With": "XMLHttpRequest"
+                    },
+                    body: `interest=${interest}`
+                })
+                .then(response => response.json())
+                .then(data => {
+                    const resultsDiv = document.getElementById("results");
+                    resultsDiv.innerHTML = "";  // clear old results
+                    if (data.careers) {
+                        data.careers.forEach(career => {
+                            const div = document.createElement("div");
+                            div.classList.add("career-card");
+                            div.textContent = career;
+                            resultsDiv.appendChild(div);
+                        });
+                    } else {
+                        resultsDiv.innerHTML = "<p>No results found.</p>";
+                    }
+                });
+            });
+        });
+
+        // Helper to get CSRF token
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== "") {
+                const cookies = document.cookie.split(";");
+                for (let cookie of cookies) {
+                    cookie = cookie.trim();
+                    if (cookie.startsWith(name + "=")) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+    </script>
 </body>
 </html>
