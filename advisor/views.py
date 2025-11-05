@@ -1,5 +1,5 @@
 from django.shortcuts import render
-from django.http import JsonResponse
+from .forms import CareerForm
 
 career_paths = {
     "ai": ["Machine Learning Engineer", "Data Scientist", "AI Researcher", "AI Product Manager"],
@@ -11,11 +11,8 @@ career_paths = {
 }
 
 def home(request):
-    return render(request, "advisor/home.html")
-
-def get_careers(request):
-    if request.method == "POST" and request.headers.get("x-requested-with") == "XMLHttpRequest":
+    careers = []
+    if request.method == "POST":
         interest = request.POST.get("interest", "").lower()
         careers = career_paths.get(interest, ["Sorry, no suggestions available for this interest."])
-        return JsonResponse({"careers": careers})
-    return JsonResponse({"error": "Invalid request"}, status=400)
+    return render(request, "advisor/home.html", {"careers": careers})

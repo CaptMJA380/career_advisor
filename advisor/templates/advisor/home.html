@@ -2,127 +2,75 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Career Advisor</title>
     <style>
-        body {
-            font-family: 'Poppins', sans-serif;
-            background: linear-gradient(to right, #a8edea, #fed6e3);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
-        }
-
-        .container {
-            background: white;
-            border-radius: 20px;
-            padding: 40px;
-            width: 420px;
-            box-shadow: 0 8px 20px rgba(0,0,0,0.1);
-            text-align: center;
-            transition: all 0.3s ease;
-        }
-
-        h2 {
-            color: #333;
-            margin-bottom: 20px;
-        }
-
-        .interest-btn {
-            background: #4a90e2;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            padding: 12px 20px;
-            margin: 8px;
-            cursor: pointer;
-            font-size: 16px;
-            transition: 0.3s;
-        }
-
-        .interest-btn:hover {
-            background: #357ABD;
-            transform: scale(1.05);
-        }
-
-        #results {
-            margin-top: 25px;
-            font-size: 16px;
-            color: #444;
-        }
-
-        .career-card {
-            background: #f1f5f9;
-            border-radius: 10px;
-            padding: 10px;
-            margin: 8px 0;
-            box-shadow: 0 3px 6px rgba(0,0,0,0.1);
-        }
+        /* your existing styles stay the same */
     </style>
 </head>
 <body>
-    <div class="container">
-        <h2>Choose Your Area of Interest</h2>
+    <h1>Career Advisor</h1>
 
-        <div id="interest-options">
-            <button class="interest-btn" data-interest="ai">AI & Machine Learning</button>
-            <button class="interest-btn" data-interest="finance">Finance</button>
-            <button class="interest-btn" data-interest="design">Design</button>
-            <button class="interest-btn" data-interest="healthcare">Healthcare</button>
-            <button class="interest-btn" data-interest="law">Law</button>
-            <button class="interest-btn" data-interest="dance">Dance</button>
+    <!-- ✅ Hidden form only to hold the CSRF token -->
+    <form id="csrf-form" method="post">
+        {% csrf_token %}
+    </form>
+
+    <div class="category-container">
+        <div class="category-card" style="background-color:#4a90e2;" onclick="getCareers('AI')">
+            <div class="icon">🤖</div>
+            AI
         </div>
-
-        <div id="results"></div>
+        <div class="category-card" style="background-color:#f5a623;" onclick="getCareers('Finance')">
+            <div class="icon">💰</div>
+            Finance
+        </div>
+        <div class="category-card" style="background-color:#d0021b;" onclick="getCareers('Design')">
+            <div class="icon">🎨</div>
+            Design
+        </div>
+        <div class="category-card" style="background-color:#7ed321;" onclick="getCareers('Healthcare')">
+            <div class="icon">🏥</div>
+            Healthcare
+        </div>
+        <div class="category-card" style="background-color:#9013fe;" onclick="getCareers('Law')">
+            <div class="icon">⚖️</div>
+            Law
+        </div>
+        <div class="category-card" style="background-color:#f76c6c;" onclick="getCareers('Dance')">
+            <div class="icon">💃</div>
+            Dance
+        </div>
     </div>
 
-    <script>
-        document.querySelectorAll(".interest-btn").forEach(button => {
-            button.addEventListener("click", function() {
-                const interest = this.getAttribute("data-interest");
-                fetch("/get_careers/", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/x-www-form-urlencoded",
-                        "X-CSRFToken": getCookie("csrftoken"),
-                        "X-Requested-With": "XMLHttpRequest"
-                    },
-                    body: `interest=${interest}`
-                })
-                .then(response => response.json())
-                .then(data => {
-                    const resultsDiv = document.getElementById("results");
-                    resultsDiv.innerHTML = "";  // clear old results
-                    if (data.careers) {
-                        data.careers.forEach(career => {
-                            const div = document.createElement("div");
-                            div.classList.add("career-card");
-                            div.textContent = career;
-                            resultsDiv.appendChild(div);
-                        });
-                    } else {
-                        resultsDiv.innerHTML = "<p>No results found.</p>";
-                    }
-                });
-            });
-        });
+    {% if careers %}
+    <div class="results">
+        <h2>Recommended Careers</h2>
+        {% for career in careers %}
+            <div class="career-item">{{ career }}</div>
+        {% endfor %}
+    </div>
+    {% endif %}
 
-        // Helper to get CSRF token
-        function getCookie(name) {
-            let cookieValue = null;
-            if (document.cookie && document.cookie !== "") {
-                const cookies = document.cookie.split(";");
-                for (let cookie of cookies) {
-                    cookie = cookie.trim();
-                    if (cookie.startsWith(name + "=")) {
-                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                        break;
-                    }
-                }
-            }
-            return cookieValue;
+    <!-- ✅ Update your script -->
+    <script>
+        async function getCareers(interest) {
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+            const formData = new FormData();
+            formData.append('interest', interest);
+
+            const response = await fetch("", {
+                method: "POST",
+                headers: {
+                    "X-CSRFToken": csrfToken
+                },
+                body: formData,
+            });
+
+            const html = await response.text();
+            document.open();
+            document.write(html);
+            document.close();
         }
     </script>
 </body>
