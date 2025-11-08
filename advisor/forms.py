@@ -1,9 +1,19 @@
 from django import forms
 
+INTEREST_CHOICES = [
+    ('ai', 'Artificial Intelligence'),
+    ('finance', 'Finance'),
+    ('design', 'Design'),
+    ('healthcare', 'Healthcare'),
+    ('law', 'Law'),
+    ('dance', 'Dance'),
+    ('sports', 'Sports'),
+    ('other', 'Other'),
+]
+
 class CareerForm(forms.Form):
-    name = forms.CharField(max_length=100, widget=forms.TextInput(attrs={
-        'placeholder': 'Enter your name'
-    }))
-    interest = forms.CharField(max_length=100, widget=forms.TextInput(attrs={
-        'placeholder': 'e.g., AI, Finance, Design, Healthcare, Law, Dance'
-    }))
+    interest = forms.ChoiceField(
+        choices=INTEREST_CHOICES,
+        label="Select Your Area of Interest",
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
