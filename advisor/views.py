@@ -1,29 +1,21 @@
+import google.generativeai as genai
+from django.conf import settings
 from django.shortcuts import render
-from django.http import JsonResponse
-from .forms import CareerForm
 
-career_paths = {
-    "ai": ["Machine Learning Engineer", "Data Scientist", "AI Researcher", "AI Product Manager"],
-    "finance": ["Investment Banker", "Financial Analyst", "Risk Manager", "Wealth Advisor"],
-    "design": ["UI/UX Designer", "Graphic Designer", "Product Designer", "Game Designer"],
-    "healthcare": ["Doctor", "Nurse", "Medical Researcher", "Healthcare Administrator"],
-    "law": ["Corporate Lawyer", "Judge", "Legal Advisor", "Criminal Lawyer"],
-    "dance": ["Choreographer", "Dance Academy", "Influencer", "Background Dancer"],
-}
+genai.configure(api_key=settings.GOOGLE_API_KEY)
 
 def home(request):
+    response_text = ""
     if request.method == "POST":
-        form = CareerForm(request.POST)
-        if form.is_valid():
-            interest = form.cleaned_data.get("interest_text") or form.cleaned_data.get("interest_choice")
-            interest = interest.lower().strip()
-            careers = career_paths.get(interest, ["Sorry, no suggestions available for this interest."])
+        user_input = request.POST.get("user_input")
+        model = genai.GenerativeModel("gemini-2.5-flash")
+        try:
+            response = model.generate_content(
+    f"You are a concise career advisor chatbot. Give a short and practical career suggestion (under 6 sentences),provide career options in bullet points and explaining each in deatil (should not exceed 4 lines) make sure to list all texr properly for: {user_input}"
+)
 
-            if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-                return JsonResponse({"careers": careers})
-            
-            return render(request, "advisor/home.html", {"form": form, "careers": careers})
-    else:
-        form = CareerForm()
-    
-    return render(request, "advisor/home.html", {"form": form})
+            response_text = response.text
+        except Exception as e:
+            response_text = f"Error: {e}"
+
+    return render(request, "advisor/home.html", {"response": response_text})

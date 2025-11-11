@@ -1,102 +1,71 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Career Path Advisor</title>
-  <style>
-    body {
-      font-family: 'Poppins', sans-serif;
-      background: linear-gradient(135deg, #0078ff, #6dd5fa, #ffffff);
-      height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .container {
-      background: white;
-      border-radius: 20px;
-      width: 500px;
-      box-shadow: 0 8px 30px rgba(0,0,0,0.15);
-      padding: 40px;
-      text-align: center;
-      transition: all 0.3s ease;
-    }
-    .container:hover {
-      transform: scale(1.02);
-    }
-    h2 {
-      color: #0078ff;
-      margin-bottom: 20px;
-    }
-    input, select {
-      width: 100%;
-      padding: 10px;
-      margin: 10px 0;
-      border-radius: 8px;
-      border: 1px solid #ccc;
-      font-size: 15px;
-    }
-    button {
-      background-color: #0078ff;
-      color: white;
-      border: none;
-      padding: 10px 25px;
-      border-radius: 8px;
-      cursor: pointer;
-      font-size: 15px;
-      transition: 0.3s;
-    }
-    button:hover {
-      background-color: #005ecb;
-    }
-    ul {
-      list-style: none;
-      padding: 0;
-      margin-top: 20px;
-      animation: fadeIn 0.5s ease-in-out;
-    }
-    li {
-      background: #eef2ff;
-      margin: 10px 0;
-      padding: 10px;
-      border-radius: 10px;
-      color: #333;
-    }
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(10px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-  </style>
+    <meta charset="UTF-8">
+    <title>Career Advisor Bot</title>
+    <style>
+        body {
+            background: #f3f6fb;
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        .chat-container {
+            background: #fff;
+            width: 400px;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        .chat-box {
+            height: 350px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            background: #f9f9f9;
+        }
+        .user-input {
+            width: 80%;
+            padding: 10px;
+            border: 1px solid #aaa;
+            border-radius: 10px;
+        }
+        button {
+            padding: 10px 15px;
+            border: none;
+            background: #007bff;
+            color: white;
+            border-radius: 10px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .response {
+            background: #e1f5fe;
+            padding: 10px;
+            border-radius: 10px;
+            margin-top: 10px;
+        }
+    </style>
 </head>
 <body>
-  <div class="container">
-    <h2>🚀 Career Path Advisor</h2>
-    <form id="careerForm">
-      {% csrf_token %}
-      {{ form.as_p }}
-      <button type="submit">Get Suggestions</button>
+<div class="chat-container">
+    <h2>💬 Career Advisor</h2>
+    <div class="chat-box" id="chatBox">
+        {% if response %}
+            <div class="response">{{ response }}</div>
+        {% endif %}
+    </div>
+    <form method="POST">
+        {% csrf_token %}
+        <input type="text" name="user_input" class="user-input" placeholder="Ask about your career..." required>
+        <button type="submit">Send</button>
     </form>
-    <div id="result"></div>
-  </div>
-
-  <script>
-    document.getElementById('careerForm').addEventListener('submit', async function(e) {
-      e.preventDefault();
-      const formData = new FormData(this);
-      
-      const response = await fetch("", {
-        method: "POST",
-        headers: {
-          "X-Requested-With": "XMLHttpRequest"
-        },
-        body: formData
-      });
-      
-      const data = await response.json();
-      const resultDiv = document.getElementById("result");
-      resultDiv.innerHTML = "<h3>Recommended Careers:</h3><ul>" +
-        data.careers.map(c => `<li>${c}</li>`).join('') + "</ul>";
-    });
-  </script>
+</div>
 </body>
 </html>
