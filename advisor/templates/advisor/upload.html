@@ -3,25 +3,22 @@
 {% block title %}Upload CV — Career Advisor{% endblock %}
 
 {% block content %}
-  <div class="max-w-3xl mx-auto bg-slate-800 p-6 rounded-lg border border-slate-700">
-    <h2 class="text-2xl font-semibold text-emerald-300">Upload your CV</h2>
-    <p class="text-slate-400 mt-1">Upload a resume (PDF, DOCX, or TXT) and get ATS feedback, job suggestions, and a clear roadmap.</p>
-
+  <div class="apple-card">
+    <h2 class="apple-title">Upload your CV</h2>
+    <div class="apple-subtitle">Upload a resume (PDF, DOCX, or TXT) and get ATS feedback, job suggestions, and a clear roadmap.</div>
     <form method="post" enctype="multipart/form-data" id="uploadForm" class="mt-4">
       {% csrf_token %}
       <div class="flex items-center gap-3">
         {{ form.file }}
-        <button type="submit" class="bg-emerald-500 text-slate-900 px-4 py-2 rounded">Upload & Analyze</button>
+        <button type="submit" class="apple-btn">Upload & Analyze</button>
       </div>
     </form>
-
     <div id="result" class="mt-4">
       {% if result_html %}
-        <div class="prose text-slate-100">{{ result_html|safe }}</div>
+        <div class="prose text-gray-800">{{ result_html|safe }}</div>
       {% endif %}
     </div>
-
-    <p class="mt-4"><a href="{% url 'home' %}" class="text-slate-400">← Back to chat</a></p>
+    <p class="mt-4"><a href="{% url 'home' %}" class="apple-btn" style="background:#eee;color:#222;">← Back to chat</a></p>
   </div>
 {% endblock %}
 

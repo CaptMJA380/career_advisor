@@ -2,59 +2,128 @@
 
 {% block title %}Career Advisor — Chat{% endblock %}
 
+
+
 {% block content %}
-<div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
-    <!-- Sidebar -->
-    <aside class="lg:col-span-1 bg-slate-800 rounded-lg p-4 border border-slate-700">
-        <div class="flex items-center justify-between">
-            <div>
-                <h3 class="text-lg font-semibold text-emerald-300">Conversations</h3>
-            </div>
-            <div class="space-x-2">
-                <a href="?new=1" class="text-sm px-2 py-1 bg-slate-700 rounded">New</a>
-                <a href="?clear=1" class="text-sm px-2 py-1 bg-rose-600 rounded">Clear</a>
-            </div>
-        </div>
-
-        <div class="mt-4 space-y-2 max-h-72 overflow-auto">
-            {% for conv in conversations %}
-                <a href="?conversation_id={{ conv.id }}" class="block p-2 rounded hover:bg-slate-700">
-                    <div class="font-medium">{% if conv.title %}{{ conv.title }}{% else %}Conversation {{ conv.id }}{% endif %}</div>
-                    <div class="text-xs text-slate-400">{{ conv.created_at|date:"M d, Y H:i" }}</div>
-                </a>
-            {% empty %}
-                <div class="text-slate-400">No conversations yet</div>
-            {% endfor %}
-        </div>
-
-        <div class="mt-4">
-            <a href="{% url 'upload_cv' %}" class="inline-block w-full text-center bg-emerald-500 text-slate-900 py-2 rounded font-semibold">Upload CV</a>
-        </div>
-    </aside>
-
-    <!-- Chat area -->
-    <section class="lg:col-span-3 bg-slate-800 rounded-lg p-4 border border-slate-700 flex flex-col">
-        <div class="flex-1 overflow-auto chat-scroll" id="messages">
+<div class="flex items-center justify-center min-h-[70vh]">
+    <section class="apple-card w-full max-w-2xl">
+        <h2 class="apple-title rainbow-text">Career Chat</h2>
+        <div class="apple-subtitle">Ask about careers, skills, or upload your CV for analysis.</div>
+        <div class="flex-1 overflow-auto chat-scroll mb-4" id="messages">
             {% for msg in messages %}
-                <div class="flex mb-3 {% if msg.sender == 'user' %}justify-end{% endif %}">
+                <div class="flex mb-4 {% if msg.sender == 'user' %}justify-end{% endif %}">
                     {% if msg.sender == 'user' %}
-                        <div class="bg-emerald-400 text-slate-900 px-4 py-2 rounded-lg max-w-3/4">{{ msg.text }}</div>
+                        <div class="bg-gray-100 text-gray-900 px-5 py-3 rounded-2xl shadow max-w-2xl animate-fade-in">{{ msg.text }}</div>
                     {% else %}
-                        <div class="bg-slate-700 text-slate-100 px-4 py-2 rounded-lg max-w-3/4">{{ msg.text|safe }}</div>
+                        <div class="bg-gray-200 text-gray-800 px-5 py-3 rounded-2xl shadow max-w-2xl animate-fade-in">{{ msg.text|safe }}</div>
                     {% endif %}
                 </div>
             {% empty %}
-                <div class="text-slate-400">Start a conversation by typing a career interest below.</div>
+                <div class="text-gray-400">Start a conversation by typing a career interest below.</div>
             {% endfor %}
         </div>
-
-        <form method="POST" id="chatForm" class="mt-4 flex gap-2">
+        <form id="chatForm" class="flex gap-3 items-center mt-6" autocomplete="off" onsubmit="return false;">
             {% csrf_token %}
-            <input id="userInput" name="user_input" class="flex-1 rounded px-4 py-2 bg-slate-900 border border-slate-700" autocomplete="off" placeholder="Type your message and press Enter..." required />
-            <button type="submit" class="bg-emerald-500 text-slate-900 px-4 py-2 rounded">Send</button>
+            <input id="userInput" name="user_input" class="flex-1 rounded-full px-5 py-3 bg-gray-50 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400 transition text-gray-900 placeholder:text-gray-400" autocomplete="off" placeholder="Type your message and press Enter..." required />
+            <button type="submit" class="apple-btn">Send</button>
         </form>
+        <div id="loadingIndicator" class="mt-4 text-gray-500 font-semibold hidden">Thinking...</div>
+        <div class="flex gap-2 mt-8">
+            <a href="?new=1" class="apple-btn">New Chat</a>
+            <a href="?clear=1" class="apple-btn" style="background:#eee;color:#222;">Clear</a>
+            <a href="{% url 'upload_cv' %}" class="apple-btn" style="background:#0071e3;">Upload CV</a>
+        </div>
+        <script>
+        // AJAX chat submission
+        const chatForm = document.getElementById('chatForm');
+        const userInput = document.getElementById('userInput');
+        const messagesDiv = document.getElementById('messages');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        let isSubmitting = false;
+        chatForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            if (isSubmitting) return;
+            const message = userInput.value.trim();
+            if (!message) return;
+            isSubmitting = true;
+            // Show user message instantly
+            const userMsgDiv = document.createElement('div');
+            userMsgDiv.className = 'flex mb-4 justify-end';
+            userMsgDiv.innerHTML = `<div class='bg-gray-100 text-gray-900 px-5 py-3 rounded-2xl shadow max-w-2xl'>${message}</div>`;
+            messagesDiv.appendChild(userMsgDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            userInput.value = '';
+            loadingIndicator.classList.remove('hidden');
+            // Prepare data for POST
+            const csrfToken = chatForm.querySelector('[name=csrfmiddlewaretoken]').value;
+            fetch(window.location.pathname, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-CSRFToken': csrfToken
+                },
+                body: `user_input=${encodeURIComponent(message)}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                loadingIndicator.classList.add('hidden');
+                if (data && data.reply) {
+                    typeAIMessage(data.reply);
+                }
+                isSubmitting = false;
+            })
+            .catch(() => {
+                loadingIndicator.classList.add('hidden');
+                isSubmitting = false;
+                // Optionally show error
+            });
+        });
+        // Typing animation for AI response
+        function typeAIMessage(text) {
+            const aiMsgDiv = document.createElement('div');
+            aiMsgDiv.className = 'flex mb-4';
+            const bubble = document.createElement('div');
+            bubble.className = 'bg-gray-200 text-gray-800 px-5 py-3 rounded-2xl shadow max-w-2xl';
+            aiMsgDiv.appendChild(bubble);
+            messagesDiv.appendChild(aiMsgDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            let i = 0;
+            function typeChar() {
+                bubble.innerHTML = text.slice(0, i) + '<span class="blinking-cursor">|</span>';
+                messagesDiv.scrollTop = messagesDiv.scrollHeight;
+                if (i < text.length) {
+                    i++;
+                    setTimeout(typeChar, 18 + Math.random() * 30);
+                } else {
+                    bubble.innerHTML = text;
+                }
+            }
+            typeChar();
+        }
+        // Blinking cursor CSS
+        const style = document.createElement('style');
+        style.innerHTML = `.blinking-cursor { animation: blink 1s steps(2, start) infinite; }\n@keyframes blink { to { visibility: hidden; } }`;
+        document.head.appendChild(style);
+        </script>
     </section>
 </div>
+
+<style>
+@keyframes fade-in {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in {
+    animation: fade-in 0.5s ease;
+}
+.rainbow-text {
+  background: linear-gradient(90deg, #ff5f57, #febc2e, #28c940, #1c89ff, #a259ff, #ff5f57);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  text-fill-color: transparent;
+}
+</style>
 {% endblock %}
 
 {% block scripts %}
