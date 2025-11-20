@@ -47,7 +47,16 @@
 <div class="chat-wrap">
     <div class="chat-app">
         <div class="sidebar">
-            <div class="brand">⚡ Career Advisor</div>
+            <div style="display:flex;justify-content:space-between;align-items:center">
+                <div class="brand">⚡ Career Advisor</div>
+                <div style="font-size:13px;color:var(--muted)">
+                    {{ request.user.username }} |
+                    <form method="post" action="/accounts/logout/" style="display:inline">
+                        {% csrf_token %}
+                        <button type="submit" style="background:none;border:none;color:#ff9b9b;cursor:pointer;padding:0;font-size:13px">Logout</button>
+                    </form>
+                </div>
+            </div>
             <div style="display:flex;gap:8px;margin-bottom:8px">
                 <a class="history-item" href="?new=1" style="color:#bde0ff;display:inline-block;">+ New</a>
                 <a class="history-item" href="?clear=1" style="color:#ff9b9b;display:inline-block;">Clear All</a>

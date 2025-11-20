@@ -1,6 +1,11 @@
 import google.generativeai as genai
 from django.conf import settings
 from django.shortcuts import render, redirect
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth import login as auth_login
+from django.shortcuts import HttpResponseRedirect
+from django.contrib.auth.models import User
+from .forms import SimpleSignupForm
 from django.utils.html import escape
 from django.utils.safestring import mark_safe
 
@@ -48,6 +53,7 @@ def _get_or_create_conversation(request):
     return conv
 
 
+@login_required
 def home(request):
     response_text = ""
     conversation = _get_or_create_conversation(request)
@@ -180,3 +186,17 @@ def home(request):
     messages = conversation.messages.all()
 
     return render(request, "advisor/home.html", {"conversation": conversation, "messages": messages, "conversations": conversations})
+
+
+def signup(request):
+    if request.method == 'POST':
+        form = SimpleSignupForm(request.POST)
+        if form.is_valid():
+            username = form.cleaned_data['username']
+            password = form.cleaned_data['password1']
+            user = User.objects.create_user(username=username, password=password)
+            auth_login(request, user)
+            return redirect('home')
+    else:
+        form = SimpleSignupForm()
+    return render(request, 'registration/signup.html', {'form': form})
