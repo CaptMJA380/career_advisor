@@ -1,0 +1,39 @@
+{% extends 'base.html' %}
+
+{% block title %}Upload CV — Career Advisor{% endblock %}
+
+{% block content %}
+  <div class="max-w-3xl mx-auto bg-slate-800 p-6 rounded-lg border border-slate-700">
+    <h2 class="text-2xl font-semibold text-emerald-300">Upload your CV</h2>
+    <p class="text-slate-400 mt-1">Upload a resume (PDF, DOCX, or TXT) and get ATS feedback, job suggestions, and a clear roadmap.</p>
+
+    <form method="post" enctype="multipart/form-data" id="uploadForm" class="mt-4">
+      {% csrf_token %}
+      <div class="flex items-center gap-3">
+        {{ form.file }}
+        <button type="submit" class="bg-emerald-500 text-slate-900 px-4 py-2 rounded">Upload & Analyze</button>
+      </div>
+    </form>
+
+    <div id="result" class="mt-4">
+      {% if result_html %}
+        <div class="prose text-slate-100">{{ result_html|safe }}</div>
+      {% endif %}
+    </div>
+
+    <p class="mt-4"><a href="{% url 'home' %}" class="text-slate-400">← Back to chat</a></p>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // basic UX: show a small loading indicator when submitting
+  const form = document.getElementById('uploadForm');
+  if(form){
+    form.addEventListener('submit', function(){
+      const btn = form.querySelector('button[type=submit]');
+      if(btn){ btn.disabled = true; btn.textContent = 'Analyzing...'; }
+    });
+  }
+</script>
+{% endblock %}

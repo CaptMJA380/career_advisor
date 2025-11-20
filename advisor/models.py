@@ -27,3 +27,12 @@ class Message(models.Model):
 
 	def __str__(self):
 		return f"{self.get_sender_display()}: {self.text[:50]}"
+
+
+class UploadedFile(models.Model):
+	file = models.FileField(upload_to='uploads/')
+	uploaded_by = models.ForeignKey('auth.User', null=True, blank=True, on_delete=models.SET_NULL)
+	uploaded_at = models.DateTimeField(auto_now_add=True)
+
+	def __str__(self):
+		return f"UploadedFile: {self.file.name}"

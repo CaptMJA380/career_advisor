@@ -53,3 +53,7 @@ class CareerForm(forms.Form):
             "class": "form-control"
         })
     )
+
+
+class UploadCVForm(forms.Form):
+    file = forms.FileField(label='Upload CV (pdf, docx, txt)', required=True)
