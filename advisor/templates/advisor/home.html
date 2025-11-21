@@ -54,29 +54,89 @@
             messagesDiv.scrollTop = messagesDiv.scrollHeight;
             userInput.value = '';
             loadingIndicator.classList.remove('hidden');
-            // Prepare data for POST
-            const csrfToken = chatForm.querySelector('[name=csrfmiddlewaretoken]').value;
-            fetch(window.location.pathname, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                    'X-CSRFToken': csrfToken
-                },
-                body: `user_input=${encodeURIComponent(message)}`
-            })
-            .then(response => response.json())
-            .then(data => {
-                loadingIndicator.classList.add('hidden');
-                if (data && data.reply) {
-                    typeAIMessage(data.reply);
-                }
-                isSubmitting = false;
-            })
-            .catch(() => {
-                loadingIndicator.classList.add('hidden');
-                isSubmitting = false;
-                // Optionally show error
-            });
+                    // Prepare data for streaming POST
+                    const csrfToken = chatForm.querySelector('[name=csrfmiddlewaretoken]').value;
+                    const body = `user_input=${encodeURIComponent(message)}`;
+
+                    // Open a streaming connection to the server
+                    fetch('/stream_chat/', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                            'X-CSRFToken': csrfToken,
+                        },
+                        body,
+                    }).then(response => {
+                        if (!response.ok) throw new Error('Network error');
+                        const reader = response.body.getReader();
+                        const decoder = new TextDecoder();
+                        let buffer = '';
+
+                        function readChunk() {
+                            return reader.read().then(({ done, value }) => {
+                                if (done) {
+                                    loadingIndicator.classList.add('hidden');
+                                    isSubmitting = false;
+                                    return;
+                                }
+                                buffer += decoder.decode(value, { stream: true });
+                                // parse SSE-like 'data: ...\n\n' and events
+                                let parts = buffer.split('\n\n');
+                                buffer = parts.pop();
+                                parts.forEach(part => {
+                                    // each part may contain multiple lines. Extract lines starting with 'data: '
+                                    const lines = part.split('\n');
+                                    let dataLines = lines.filter(l => l.startsWith('data:'));
+                                    dataLines.forEach(l => {
+                                        const payload = l.replace(/^data:\s*/, '');
+                                        if (payload === '') return; // ignore empty
+                                        // append payload to AI bubble (typing)
+                                        streamAppend(payload);
+                                    });
+                                    // handle event: done or error
+                                    lines.forEach(l => {
+                                        if (l.startsWith('event:')) {
+                                            const ev = l.replace(/^event:\s*/, '');
+                                            if (ev === 'done') {
+                                                loadingIndicator.classList.add('hidden');
+                                                isSubmitting = false;
+                                            }
+                                            if (ev === 'error') {
+                                                loadingIndicator.classList.add('hidden');
+                                                isSubmitting = false;
+                                                // optionally show error
+                                            }
+                                        }
+                                    });
+                                });
+                                return readChunk();
+                            });
+                        }
+
+                        // create AI bubble to receive streaming text
+                        const aiMsgDiv = document.createElement('div');
+                        aiMsgDiv.className = 'flex mb-4';
+                        const bubble = document.createElement('div');
+                        bubble.className = 'bg-gray-200 text-gray-800 px-5 py-3 rounded-2xl shadow max-w-2xl';
+                        aiMsgDiv.appendChild(bubble);
+                        messagesDiv.appendChild(aiMsgDiv);
+                        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+                        // append partial payloads to this bubble
+                        function streamAppend(text) {
+                            // append raw text (no type animation here because server streams small chunks)
+                            bubble.textContent = bubble.textContent + text;
+                            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+                        }
+
+                        readChunk().catch(() => {
+                            loadingIndicator.classList.add('hidden');
+                            isSubmitting = false;
+                        });
+                    }).catch(() => {
+                        loadingIndicator.classList.add('hidden');
+                        isSubmitting = false;
+                    });
         });
         // Typing animation for AI response
         function typeAIMessage(text) {

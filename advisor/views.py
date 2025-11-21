@@ -166,7 +166,8 @@ def home(request):
                     "Provide the response using these labeled sections exactly:\n"
                     "Summary:\nSubtopics:\nDetails:\nNext Steps:\n\n"
                     "Under 'Subtopics:' list 5 concise bullet subtopics (one per line starting with '- '). "
-                    "At the end, ask the user which subtopic they'd like more details on. Reply in clear sentences."
+                    "At the end, ask the user which subtopic they'd like more details on. Reply in clear sentences. "
+                    "Also include one brief follow-up question (<=20 words) at the very end to keep the conversation going."
                 )
 
             def structured_prompt_for_subtopic(topic, area):
@@ -178,7 +179,8 @@ def home(request):
                     "In 'Roadmap:' provide a numbered list of at least 5 practical steps the user can follow to pursue careers in this subtopic. "
                     "Format each roadmap step as a numbered line starting with '1. ' (e.g. '1. Learn the basics (2-4 weeks): ...'). "
                     "Include an estimated duration for each step in parentheses (e.g. '2-4 weeks', '3-6 months'). "
-                    "Where appropriate include one recommended resource or action per step. Reply in clear sentences and do not repeat previous subtopics or other sections."
+                    "Where appropriate include one recommended resource or action per step. Reply in clear sentences and do not repeat previous subtopics or other sections. "
+                    "Include one brief follow-up question (<=20 words) at the very end to prompt the user for the next input."
                 )
 
             if conversation.state in ("new", "await_interest"):
@@ -199,7 +201,8 @@ def home(request):
             else:
                 prompt = (
                     f"You are a concise career advisor. Provide a short structured response for: {user_input}. "
-                    "Use the labeled sections: Summary:, Subtopics:, Details:, Next Steps:."
+                    "Use the labeled sections: Summary:, Subtopics:, Details:, Next Steps:. "
+                    "At the end include one short follow-up question (<=20 words) to keep the user engaged."
                 )
                 response = model.generate_content(prompt)
                 response_text = response.text
@@ -273,10 +276,101 @@ def upload_cv(request):
         uploaded = UploadedFile.objects.create(file=f, uploaded_by=request.user)
         path = uploaded.file.path
 
-        # extract text from file
-        text = extract_text_from_file(path)
+        # attempt extraction with debug information to give better feedback
+        def try_extract_debug(path):
+            import os
+            name = os.path.basename(path).lower()
+            reasons = []
+            # txt
+            if name.endswith('.txt'):
+                try:
+                    with open(path, 'r', encoding='utf-8', errors='ignore') as fh:
+                        return fh.read(), None
+                except Exception as e:
+                    reasons.append(f"TXT read error: {e}")
+            # pdf
+            if name.endswith('.pdf'):
+                try:
+                    import PyPDF2
+                except Exception as e:
+                    reasons.append(f"PyPDF2 not available: {e}")
+                else:
+                    try:
+                        text_parts = []
+                        with open(path, 'rb') as fh:
+                            reader = PyPDF2.PdfReader(fh)
+                            for page in reader.pages:
+                                try:
+                                    text_parts.append(page.extract_text() or '')
+                                except Exception:
+                                    pass
+                        joined = '\n'.join(text_parts)
+                        # detect if extraction returned PDF internal structure (common when page.extract_text fails)
+                        sample = joined[:1000]
+                        def looks_like_pdf_internal(s):
+                            if not s:
+                                return True
+                            markers = ['%PDF', '/Type', '/Font', 'xref', 'stream']
+                            for m in markers:
+                                if m in s:
+                                    return True
+                            # printable ratio
+                            printable = sum(1 for c in s if 32 <= ord(c) <= 126)
+                            if len(s) > 0 and (printable / max(1, len(s))) < 0.6:
+                                return True
+                            return False
+
+                        if joined and not looks_like_pdf_internal(sample):
+                            return joined, None
+                        # fallback: try pdfminer.six if PyPDF2 result looks like internal PDF data or empty
+                        try:
+                            from pdfminer.high_level import extract_text as pdfminer_extract_text
+                        except Exception as e:
+                            reasons.append(f"PyPDF2 output unusable and pdfminer.six not available: {e}")
+                        else:
+                            try:
+                                pm_text = pdfminer_extract_text(path)
+                                if pm_text and not looks_like_pdf_internal(pm_text[:1000]):
+                                    return pm_text, None
+                                else:
+                                    reasons.append("pdfminer.six returned no usable text")
+                            except Exception as e:
+                                reasons.append(f"pdfminer extraction error: {e}")
+                    except Exception as e:
+                        reasons.append(f"PDF extraction error: {e}")
+            # docx
+            if name.endswith('.docx') or name.endswith('.doc'):
+                try:
+                    import docx
+                except Exception as e:
+                    reasons.append(f"python-docx not available: {e}")
+                else:
+                    try:
+                        doc = docx.Document(path)
+                        paragraphs = [p.text for p in doc.paragraphs]
+                        return '\n'.join(paragraphs), None
+                    except Exception as e:
+                        reasons.append(f"DOCX extraction error: {e}")
+
+            # fallback: try reading as binary and attempt utf-8 decode
+            try:
+                with open(path, 'rb') as fh:
+                    raw = fh.read()
+                    try:
+                        return raw.decode('utf-8', errors='ignore'), None
+                    except Exception as e:
+                        reasons.append(f"Binary decode error: {e}")
+            except Exception as e:
+                reasons.append(f"Could not open file: {e}")
+
+            return None, '<br>'.join(reasons) if reasons else 'Unknown error'
+
+        text, error = try_extract_debug(path)
         if not text:
-            result_html = '<p>Could not extract text from this file format.</p>'
+            msg = "Could not extract text from this file."
+            if error:
+                msg += f" Details: {error}"
+            result_html = f"<div style='color:#b91c1c;background:#fff1f2;padding:12px;border-radius:8px'>{escape(msg)}</div>"
             return render(request, 'advisor/upload.html', {'form': form, 'result_html': result_html})
 
         # build structured prompt
@@ -322,3 +416,104 @@ def signup(request):
     else:
         form = SimpleSignupForm()
     return render(request, 'registration/signup.html', {'form': form})
+
+
+@login_required
+def stream_chat(request):
+    """Stream chat responses back to the browser using SSE-style events.
+
+    Fallback behaviour: if the model client doesn't support streaming, we generate
+    the full reply and then stream it in small chunks so the frontend receives
+    content progressively.
+    """
+    from django.http import StreamingHttpResponse
+
+    if request.method != 'POST':
+        return StreamingHttpResponse(status=405)
+
+    user_input = (request.POST.get('user_input') or '').strip()
+    if not user_input:
+        return StreamingHttpResponse(status=400)
+
+    # Save user message to DB
+    conversation = _get_or_create_conversation(request)
+    Message.objects.create(conversation=conversation, sender='user', text=user_input)
+
+    model = genai.GenerativeModel("gemini-2.5-flash")
+
+    # Build prompt similar to home view (reuse earlier helpers if necessary)
+    prompt = (
+        f"You are a concise career advisor. Provide a short structured response for: {user_input}. "
+        "Use the labeled sections: Summary:, Subtopics:, Details:, Next Steps:. At the end include one short follow-up question (<=20 words)."
+    )
+
+    def event_stream_from_text(text, chunk_size=40, delay=0.02):
+        """Yield server-sent-event formatted chunks from a full text response."""
+        import time
+        i = 0
+        L = len(text)
+        while i < L:
+            chunk = text[i:i+chunk_size]
+            i += chunk_size
+            # SSE format: data: <payload>\n\n
+            yield f"data: {chunk}\n\n"
+            if delay:
+                time.sleep(delay)
+        # signal end
+        yield "event: done\ndata: \n\n"
+
+    # Try to use streaming API if available. If not, fall back to generating full text
+    try:
+        # Some clients expose a streaming generator. Try to detect common APIs.
+        if hasattr(model, 'stream'):
+            # hypothetical streaming API: model.stream(prompt) yields partial strings
+            def generator():
+                try:
+                    for part in model.stream(prompt):
+                        yield f"data: {part}\n\n"
+                    yield "event: done\ndata: \n\n"
+                except Exception as e:
+                    yield f"event: error\ndata: {escape(str(e))}\n\n"
+            return StreamingHttpResponse(generator(), content_type='text/event-stream')
+
+        # Another hypothetical API: model.generate_content(..., stream=True) returns iterable
+        if hasattr(model, 'generate_content'):
+            # Some SDKs support stream=True; try and catch if unsupported
+            try:
+                gen = model.generate_content(prompt, stream=True)
+                if hasattr(gen, '__iter__'):
+                    def generator_from_gen():
+                        try:
+                            for part in gen:
+                                # part might be object with .text or a string
+                                text_part = getattr(part, 'text', str(part))
+                                yield f"data: {text_part}\n\n"
+                            yield "event: done\ndata: \n\n"
+                        except Exception as e:
+                            yield f"event: error\ndata: {escape(str(e))}\n\n"
+                    return StreamingHttpResponse(generator_from_gen(), content_type='text/event-stream')
+            except TypeError:
+                # stream not supported, fall back
+                pass
+            except Exception:
+                # any other failure, we'll fall back
+                pass
+
+        # Fallback: generate full response and stream it in chunks
+        response = model.generate_content(prompt)
+        full_text = response.text
+
+        # Save AI response as before (formatted HTML)
+        def format_ai_response_for_save(text):
+            # reuse simpler formatting used elsewhere
+            return format_ai_response(text)
+
+        Message.objects.create(conversation=conversation, sender='ai', text=format_ai_response_for_save(full_text))
+
+        return StreamingHttpResponse(event_stream_from_text(full_text), content_type='text/event-stream')
+
+    except Exception as e:
+        # If something unexpected happens, return an error event
+        def err():
+            yield f"event: error\ndata: {escape(str(e))}\n\n"
+        return StreamingHttpResponse(err(), content_type='text/event-stream')
